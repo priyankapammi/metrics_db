@@ -1,0 +1,69 @@
+# CICD Pipeline for MetricsDB
+trigger:
+  branches:
+    include:
+    - FargateBranch-Master
+ 
+resources:
+- repo: self
+ 
+stages:
+- stage: Build
+  displayName: Build image
+  jobs:  
+  - job: Build
+    displayName: Build
+    pool:
+      name: GenericPoolLinux
+    steps:
+    
+ 
+    - task: CmdLine@2
+      inputs:
+        script: |
+          sudo curl -L "https://github.com/docker/compose/releases/download/1.24.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          docker-compose build
+          docker images
+    - task: CmdLine@2
+      inputs:
+        script: 'docker images'
+ 
+- stage: AWS
+  displayName: Push and Deploy to ECS
+  dependsOn: Build
+  condition: succeeded()
+  jobs:  
+  - job: Token
+    displayName: Log in to AWS
+    pool:
+      name: GenericPoolLinux
+    steps:
+    - task: awsTokenBroker@1
+      inputs:
+        serviceConnection: 'AWS Generic'
+        roleName: WS-00FQ-role_AUTOMATION
+ 
+    - script: |
+        echo $(AWS.AccessKeyId)
+        echo $(AWS.SecretAccessKey)
+        echo $(AWS.SessionToken)
+        echo $(AWS.Region)
+      displayName: Display shadowed values ("AWS." vars as pipeline vars)    
+ 
+    
+    - task: ECRPushImage@1
+      inputs:
+        awsCredentials:
+        regionName: 'eu-west-1'
+        imageSource: 'imagename'
+        sourceImageName: 's_web'
+        repositoryName: 'connected_innovation'
+        autoCreateRepository: true'
+  
+ #   - task: AWSCLI@1
+ #     inputs:
+ #       awsCredentials: 
+ #       regionName: 'eu-west-1'
+ #       awsCommand: 'ecs'
+ #       awsSubCommand: 'update-service'
+ #       awsArguments: '--cluster default --service balanaced --desired-count 1 --task-definition django --force-new-deployment' 

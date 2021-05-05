@@ -1,0 +1,39 @@
+# CICD Pipeline for MetricsDB
+trigger:
+  branches:
+    include:
+    - FargateBranch-Master
+ 
+resources:
+- repo: self
+ 
+stages:
+- stage: Build
+  displayName: Build image
+  jobs:  
+  - job: Build
+    displayName: Build
+    pool:
+      name: GenericPoolLinux
+    steps:
+    - task: CopyFilesOverSSH@0
+      inputs:
+        sshEndpoint: '10.57.71.85'
+        sourceFolder: '.'
+        Contents: |
+          **
+          !virtualenv/**
+          !/**/*.pcy
+        overwrite: true
+        readyTimeout: '20000'
+      continueOnError: true   
+        
+    - task: SSH@0
+      inputs:
+        sshEndpoint: '10.57.71.85'
+        runOptions: 'inline'
+        inline: |
+          docker-compose up
+        readyTimeout: '20000'
+      timeoutInMinutes: 2
+      continueOnError: true
